@@ -2,6 +2,10 @@
 
 A Windows desktop status center for Minecraft Java modpack upgrades. Track mods and datapacks from Modrinth, compare current and target Minecraft support, investigate blockers, and record scoped manual decisions. It never installs mods or touches game directories.
 
+## AI development disclosure
+
+The Mod Menagerie was built using AI (OpenAI Codex), which generated substantial portions of the application code, tests, and documentation under human direction. AI-generated work can contain mistakes or omissions, even when tests pass. Review the code and independently verify compatibility results before relying on them for a modpack upgrade.
+
 ## Requirements
 
 - Windows 11 x64 (tested on build 26200). WPF/.NET 10; other Windows versions and architectures have not been validated.
