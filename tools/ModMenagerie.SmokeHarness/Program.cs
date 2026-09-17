@@ -10,8 +10,16 @@ namespace ModMenagerie.SmokeHarness;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
+        if (args.Contains("--live-phase2"))
+        {
+            var phaseStore = new SqliteStore(Path.Combine(AppContext.BaseDirectory, "phase2-data", "menagerie.db"));
+            using var provider = new ModrinthClient();
+            var phaseApp = new System.Windows.Application();
+            phaseApp.Run(new MainWindow(new Tracker(phaseStore, provider)) { Title = "The Mod Menagerie — PHASE 2 TEST ONLY" });
+            return;
+        }
         var store = new SqliteStore(Path.Combine(AppContext.BaseDirectory, "smoke-data", "menagerie.db"));
         if (store.Packs().Count == 0)
         {

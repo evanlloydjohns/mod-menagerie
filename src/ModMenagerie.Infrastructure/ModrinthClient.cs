@@ -140,9 +140,38 @@ public sealed class ModrinthClient : IProvider, IDisposable
             throw new InvalidDataException("Version list is incomplete.");
         if (doc.RootElement.EnumerateArray().Any(e => e.ValueKind != JsonValueKind.Object))
             throw new InvalidDataException("Version list contains malformed entries. Retry later.");
-        var versions = doc.RootElement.EnumerateArray().Select(e => new Release(S(e, "id"), S(e, "version_number"), S(e, "name"), S(e, "version_type"), Date(e, "date_published") ?? default,
-            A(e, "game_versions"), A(e, "loaders"), S(e, "project_id") == id && ValidArray(e, "game_versions") && ValidArray(e, "loaders") && S(e, "status") is "listed" or "archived" or "unlisted")).ToArray();
+        var versions = doc.RootElement.EnumerateArray().Select(e => MapRelease(e, id)).ToArray();
         return new(id, versions, DateTimeOffset.UtcNow, true);
+    }
+    private static Release MapRelease(JsonElement e, string projectId)
+    {
+        Dependency[]? dependencies = null;
+        if (e.TryGetProperty("dependencies", out var array) && array.ValueKind == JsonValueKind.Array && array.EnumerateArray().All(d => d.ValueKind == JsonValueKind.Object))
+            dependencies = array.EnumerateArray().Select(d => new Dependency(S(d, "project_id"), S(d, "version_id"), S(d, "dependency_type"), S(d, "file_name"))).ToArray();
+        return new(S(e, "id"), S(e, "version_number"), S(e, "name"), S(e, "version_type"), Date(e, "date_published") ?? default,
+            A(e, "game_versions"), A(e, "loaders"), S(e, "project_id") == projectId && ValidArray(e, "game_versions") && ValidArray(e, "loaders") && S(e, "status") is "listed" or "archived" or "unlisted", dependencies);
+    }
+    public async Task<ResolvedVersion> VersionAsync(string id, CancellationToken token)
+    {
+        using var doc = await Get("version/" + Uri.EscapeDataString(id), token);
+        var root = doc.RootElement;
+        if (root.ValueKind != JsonValueKind.Object || S(root, "id") != id || string.IsNullOrWhiteSpace(S(root, "project_id")))
+            throw new InvalidDataException("Version identity is missing or inconsistent.");
+        return new(S(root, "project_id"), MapRelease(root, S(root, "project_id")));
+    }
+    public async Task<ResolvedVersion> HashAsync(string hash, string algorithm, CancellationToken token)
+    {
+        var length = algorithm == "sha512" ? 128 : algorithm == "sha1" ? 40 : 0;
+        if (length == 0 || hash.Length != length || !hash.All(Uri.IsHexDigit)) throw new ArgumentException("Invalid file hash.");
+        using var doc = await Get($"version_file/{hash}?algorithm={algorithm}&multiple=true", token);
+        var root = doc.RootElement;
+        var entries = root.ValueKind == JsonValueKind.Array ? root.EnumerateArray().ToArray() : [root];
+        if (entries.Length != 1 || entries[0].ValueKind != JsonValueKind.Object) throw new InvalidDataException("Hash does not resolve uniquely to one release.");
+        var e = entries[0];
+        if (string.IsNullOrWhiteSpace(S(e, "project_id")) || string.IsNullOrWhiteSpace(S(e, "id")) || !e.TryGetProperty("files", out var files) || files.ValueKind != JsonValueKind.Array ||
+            !files.EnumerateArray().Any(f => f.ValueKind == JsonValueKind.Object && f.TryGetProperty("hashes", out var hashes) && hashes.ValueKind == JsonValueKind.Object && string.Equals(S(hashes, algorithm), hash, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidDataException("Resolved release did not confirm the requested hash.");
+        return new(S(e, "project_id"), MapRelease(e, S(e, "project_id")));
     }
     public async Task<ReferenceData> ReferencesAsync(CancellationToken token)
     {

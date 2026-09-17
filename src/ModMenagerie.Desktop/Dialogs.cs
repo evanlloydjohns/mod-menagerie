@@ -268,6 +268,7 @@ public sealed class AddDialog : Window
                 if (distribution == Distribution.Datapack && !preview.Loaders.Contains("datapack") && preview.Type != "datapack")
                     throw new ArgumentException("This project does not advertise datapack distribution. Choose Mod or another project.");
                 var added = tracker.Store.Add(new(pack.Id, preview.Id, distribution), preview);
+                if (added) tracker.Capture(pack, "Membership added");
                 feedback.Text = added ? $"Added {preview.Name}. Refresh the modpack to evaluate support." : "This project is already in the modpack; duplicate prevented.";
             }
             catch (Exception ex) { App.Log(ex); feedback.Text = "Not saved. " + MainWindow.FriendlyError(ex); }

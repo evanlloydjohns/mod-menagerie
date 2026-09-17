@@ -16,12 +16,12 @@ public sealed class Tracker(IStore store, IProvider provider)
         var cache = store.Versions(m.ProjectId);
         var evaluation = store.Evaluation(scope);
         // A new context can use complete dated metadata, but never an old scoped result.
-        if (evaluation == null && cache != null)
+        if (cache != null && (evaluation == null || evaluation.Error == null))
         {
-            var evidence = CompatibilityEngine.Evaluate(cache, pack.Target, pack.Loader, m.Form);
+            var evidence = CompatibilityEngine.Evaluate(cache, pack.Target, pack.Loader, m.Form, store.Rules(pack.Id, m.ProjectId));
             evaluation = new(scope, evidence, cache.Retrieved, evidence.Status == Compatibility.Unknown ? null : evidence, null);
         }
-        return new ProjectRow(m, p, evaluation, store.Decision(scope), CompatibilityEngine.Evaluate(cache, pack.Current, pack.Loader, m.Form),
+        return new ProjectRow(m, p, evaluation, store.Decision(scope), CompatibilityEngine.Evaluate(cache, pack.Current, pack.Loader, m.Form, store.Rules(pack.Id, m.ProjectId)),
             cache?.Releases.Where(r => r.Valid).OrderByDescending(r => r.Published).ThenBy(r => r.Id, StringComparer.Ordinal).FirstOrDefault());
     }).ToArray();
 
@@ -33,6 +33,7 @@ public sealed class Tracker(IStore store, IProvider provider)
             throw new ArgumentException("Choose a supported manual status.");
         var scope = ScopeFor(pack, member);
         store.SaveDecision(scope, status == null ? null : new(scope, status.Value, note, string.IsNullOrWhiteSpace(reference) ? null : reference.Trim(), DateTimeOffset.UtcNow));
+        Capture(pack, "Manual decision");
     }
 
     public async Task<RefreshResult> RefreshAsync(Pack pack, IProgress<RefreshProgress>? progress, CancellationToken token)
@@ -52,7 +53,7 @@ public sealed class Tracker(IStore store, IProvider provider)
                 var previous = store.Evaluation(scope)?.LastSuccess;
                 if (previous == null && store.Versions(member.ProjectId) is { } savedCache)
                 {
-                    var cached = CompatibilityEngine.Evaluate(savedCache, pack.Target, pack.Loader, member.Form);
+                    var cached = CompatibilityEngine.Evaluate(savedCache, pack.Target, pack.Loader, member.Form, store.Rules(pack.Id, member.ProjectId));
                     if (cached.Status != Compatibility.Unknown)
                         previous = cached;
                 }
@@ -64,7 +65,7 @@ public sealed class Tracker(IStore store, IProvider provider)
                 {
                     project = await provider.ProjectAsync(member.ProjectId, token);
                     cache = await provider.VersionsAsync(member.ProjectId, token);
-                    var evidence = CompatibilityEngine.Evaluate(cache, pack.Target, pack.Loader, member.Form);
+                    var evidence = CompatibilityEngine.Evaluate(cache, pack.Target, pack.Loader, member.Form, store.Rules(pack.Id, member.ProjectId));
                     evaluation = new(scope, evidence, attempt, evidence.Status == Compatibility.Unknown ? previous : evidence,
                         evidence.Status == Compatibility.Unknown ? evidence.Reason : null);
                 }
@@ -81,10 +82,13 @@ public sealed class Tracker(IStore store, IProvider provider)
                     bad++;
                 progress?.Report(new(good + bad, members.Length, good, bad, project?.Name ?? member.ProjectId));
             }
+            Capture(pack, token.IsCancellationRequested ? "Refresh canceled" : "Refresh");
             return new(good, bad, members.Length - good - bad);
         }
         finally { refreshing.TryRemove(pack.Id, out _); }
     }
+
+    public void Capture(Pack pack, string kind) => store.RecordHistory(pack, kind, Rows(pack));
 
     public static (string Slug, Distribution Form) ParseUrl(string input)
     {

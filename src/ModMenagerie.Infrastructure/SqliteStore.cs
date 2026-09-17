@@ -5,7 +5,7 @@ using ModMenagerie.Domain;
 
 namespace ModMenagerie.Infrastructure;
 
-public sealed class SqliteStore : IStore
+public sealed partial class SqliteStore : IStore
 {
     private readonly string connectionString;
     public SqliteStore(string path)
@@ -15,7 +15,7 @@ public sealed class SqliteStore : IStore
         using var db = Open();
         using var transaction = db.BeginTransaction();
         var version = Convert.ToInt32(Command(db, transaction, "PRAGMA user_version").ExecuteScalar());
-        if (version > 1)
+        if (version > 2)
             throw new InvalidDataException("This database was created by a newer app. Use that version; the database has not been reset.");
         if (version == 0)
             Command(db, transaction, """
@@ -27,6 +27,13 @@ public sealed class SqliteStore : IStore
                 CREATE TABLE overrides(pack TEXT NOT NULL, project TEXT NOT NULL, target TEXT NOT NULL, loader TEXT NOT NULL, form INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY(pack,project,target,loader,form), FOREIGN KEY(pack,project) REFERENCES memberships(pack,project) ON DELETE CASCADE);
                 CREATE TABLE preferences(key TEXT PRIMARY KEY, value TEXT NOT NULL);
                 PRAGMA user_version=1;
+                """).ExecuteNonQuery();
+        if (version < 2)
+            Command(db, transaction, """
+                CREATE TABLE range_rules(pack TEXT NOT NULL REFERENCES packs(id) ON DELETE CASCADE, project TEXT NOT NULL, release TEXT NOT NULL, loader TEXT NOT NULL, form INTEGER NOT NULL, pattern TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY(pack,project,release,loader,form,pattern), FOREIGN KEY(pack,project) REFERENCES memberships(pack,project) ON DELETE CASCADE);
+                CREATE TABLE history(id INTEGER PRIMARY KEY AUTOINCREMENT, pack TEXT NOT NULL REFERENCES packs(id) ON DELETE CASCADE, time TEXT NOT NULL, data TEXT NOT NULL);
+                CREATE INDEX history_pack ON history(pack,id);
+                PRAGMA user_version=2;
                 """).ExecuteNonQuery();
         transaction.Commit();
     }

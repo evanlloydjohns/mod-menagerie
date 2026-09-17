@@ -68,11 +68,39 @@ public class ApiTests
         Assert.NotEmpty(cache.Releases);
         Assert.All(cache.Releases, r => Assert.True(r.Valid));
         var candidate = cache.Releases.First(r => r.Loaders.Contains("fabric"));
+        var exact = await api.VersionAsync(candidate.Id, default);
+        Assert.Equal(project.Id, exact.ProjectId);
+        Assert.NotNull(exact.Release.Dependencies);
+        using var metadataClient = new HttpClient();
+        metadataClient.DefaultRequestHeaders.UserAgent.ParseAdd("TheModMenagerie/1.0 (integration-test)");
+        using var metadata = System.Text.Json.JsonDocument.Parse(await metadataClient.GetStringAsync("https://api.modrinth.com/v2/version/" + candidate.Id));
+        var hash = metadata.RootElement.GetProperty("files")[0].GetProperty("hashes").GetProperty("sha512").GetString()!;
+        var identified = await api.HashAsync(hash, "sha512", default);
+        Assert.Equal(project.Id, identified.ProjectId);
+        Assert.Equal(candidate.Id, identified.Release.Id);
         Assert.True(CompatibilityEngine.Positive(CompatibilityEngine.Evaluate(cache, candidate.GameVersions[0], "fabric", Distribution.Mod).Status));
         var datapack = await api.ProjectAsync("terralith", default);
         var data = await api.VersionsAsync(datapack.Id, default);
         var release = data.Releases.First(r => r.Loaders.Contains("datapack"));
         Assert.True(CompatibilityEngine.Positive(CompatibilityEngine.Evaluate(data, release.GameVersions[0], "fabric", Distribution.Datapack).Status));
+    }
+    [Fact]
+    public async Task VersionDependenciesAreBoundToTheRequestedRelease()
+    {
+        using var api = new ModrinthClient(new HttpClient(new Handler(_ => Json("""{"id":"v","project_id":"p","version_number":"1","version_type":"release","date_published":"2026-09-16T10:00:00Z","status":"listed","game_versions":["26.3"],"loaders":["fabric"],"dependencies":[{"project_id":"q","version_id":"exact","dependency_type":"required"}]}"""))));
+        var result = await api.VersionAsync("v", default);
+        Assert.Equal("p", result.ProjectId);
+        Assert.Equal("exact", Assert.Single(result.Release.Dependencies!).VersionId);
+        await Assert.ThrowsAsync<InvalidDataException>(() => api.VersionAsync("other", default));
+    }
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("[{},{}]")]
+    [InlineData("{\"id\":\"v\",\"project_id\":\"p\",\"files\":[]}")]
+    public async Task HashResolutionRejectsAmbiguityAndMissingHashEvidence(string json)
+    {
+        using var api = new ModrinthClient(new HttpClient(new Handler(_ => Json(json))));
+        await Assert.ThrowsAsync<InvalidDataException>(() => api.HashAsync(new string('a', 128), "sha512", default));
     }
 }
 public sealed class LiveFactAttribute : FactAttribute

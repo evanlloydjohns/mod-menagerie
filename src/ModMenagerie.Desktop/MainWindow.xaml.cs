@@ -26,6 +26,7 @@ public partial class MainWindow : Window
         Theme.Apply(tracker.Store.Preference("theme") != "light");
         Theme.SetAccent(tracker.Store.Preference("accent"));
         InitializeComponent();
+        Footer.ToolTip = "Local data: " + App.DataDirectory;
         AccentPicker.ItemsSource = Theme.Accents;
         AccentPicker.SelectedItem = Theme.Accent;
         ThemeButton.Content = Theme.IsDark ? "Light mode" : "Dark mode";
@@ -204,7 +205,7 @@ public partial class MainWindow : Window
     {
         var dialog = new PackDialog(pack, references, tracker) { Owner = this };
         if (dialog.ShowDialog() == true)
-            Do(() => { tracker.Store.SavePack(dialog.Result!); references = dialog.References; LoadPacks(dialog.Result!.Id); });
+            Do(() => { tracker.Store.SavePack(dialog.Result!); references = dialog.References; LoadPacks(dialog.Result!.Id); tracker.Capture(dialog.Result!, "Collection settings"); });
     }
     private void DeletePack(object sender, RoutedEventArgs e)
     {
@@ -221,7 +222,7 @@ public partial class MainWindow : Window
     private void RemoveProject(object sender, RoutedEventArgs e)
     {
         if (Table.SelectedItem is ProjectRow r && MessageBox.Show(this, $"Remove {r.Name} from this modpack and remove its scoped decisions?", "Remove project", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
-            Do(() => { tracker.Store.Remove(r.Membership); Reload(); });
+            Do(() => { tracker.Store.Remove(r.Membership); tracker.Capture(active!, "Membership removed"); Reload(); });
     }
     private async void Refresh(object sender, RoutedEventArgs e)
     {
@@ -299,6 +300,9 @@ public partial class MainWindow : Window
             Details.Children.Add(Text($"Check failed: {r.Evaluation.Error}\nLast known: {CompatibilityEngine.Label(r.Evaluation.LastSuccess?.Status ?? Compatibility.Unknown)} · {r.Evaluation.LastSuccess?.Time.ToLocalTime():g}\nLast-known release: {r.Evaluation.LastSuccess?.Candidate?.Number ?? "None"}"));
         if (r.Evaluation?.Automatic.Candidate is { } candidate)
             Link("Open selected target release", $"https://modrinth.com/mod/{p.Slug}/version/{candidate.Id}");
+        var rangeButton = new Button { Content = "Version-range evidence…", Margin = new Thickness(0, 0, 0, 12) };
+        rangeButton.Click += (_, _) => { new RangeDialog(tracker, active!, r.Project) { Owner = this }.ShowDialog(); Reload(); };
+        Details.Children.Add(rangeButton);
         Details.Children.Add(Text("Manual decision", 18));
         if (r.Decision != null)
         {

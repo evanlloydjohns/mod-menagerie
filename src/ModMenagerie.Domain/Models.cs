@@ -21,7 +21,12 @@ public sealed record Pack(string Id, string Name, string Current, string Target,
 }
 public sealed record Membership(string PackId, string ProjectId, Distribution Form);
 public sealed record Scope(string PackId, string ProjectId, string Target, string Loader, Distribution Form);
-public sealed record Release(string Id, string Number, string Name, string Channel, DateTimeOffset Published, string[] GameVersions, string[] Loaders, bool Valid = true);
+public sealed record Release(string Id, string Number, string Name, string Channel, DateTimeOffset Published, string[] GameVersions, string[] Loaders, bool Valid = true, Dependency[]? Dependencies = null);
+public sealed record Dependency(string? ProjectId, string? VersionId, string Kind, string? FileName);
+public sealed record ResolvedVersion(string ProjectId, Release Release);
+public sealed record RangeRule(string PackId, string ProjectId, string ReleaseId, string Loader, Distribution Form, string Pattern, string Reference, string Note, DateTimeOffset Modified);
+public sealed record HistoryItem(string ProjectId, string Name, Distribution Form, Compatibility Automatic, Compatibility Effective, string? Candidate, string? Note, ManualDecision? Decision = null);
+public sealed record HistoryEntry(long Id, string Kind, DateTimeOffset Time, Pack Pack, HistoryItem[] Items);
 public sealed record Project
 {
     public override string ToString() => Name;

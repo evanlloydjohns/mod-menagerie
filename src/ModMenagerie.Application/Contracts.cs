@@ -10,6 +10,8 @@ public interface IProvider
     Task<Project> ProjectAsync(string idOrSlug, CancellationToken token);
     Task<VersionCache> VersionsAsync(string id, CancellationToken token);
     Task<ReferenceData> ReferencesAsync(CancellationToken token);
+    Task<ResolvedVersion> VersionAsync(string id, CancellationToken token) => throw new NotSupportedException();
+    Task<ResolvedVersion> HashAsync(string hash, string algorithm, CancellationToken token) => throw new NotSupportedException();
 }
 public interface IStore
 {
@@ -27,6 +29,12 @@ public interface IStore
     void SaveRefresh(Project? project, VersionCache? cache, Evaluation evaluation);
     string? Preference(string key);
     void Preference(string key, string value);
+    IReadOnlyList<RangeRule> Rules(string packId, string projectId);
+    void SaveRule(RangeRule rule);
+    void DeleteRule(RangeRule rule);
+    void RecordHistory(Pack pack, string kind, ProjectRow[] rows);
+    IReadOnlyList<HistoryEntry> History(string packId);
+    int Import(Pack pack, bool create, IReadOnlyList<(Project Project, Distribution Form)> projects);
 }
 public sealed record RefreshProgress(int Completed, int Total, int Succeeded, int Failed, string Project);
 public sealed record RefreshResult(int Succeeded, int Failed, int Unprocessed);

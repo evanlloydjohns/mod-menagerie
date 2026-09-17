@@ -25,4 +25,4 @@ $shortcut.Save()
 if (!(Test-Path -LiteralPath $target) -or !(Test-Path -LiteralPath $shortcutPath)) { throw 'Installation verification failed.' }
 Write-Output "Installed: $target"
 Write-Output "Start menu: $shortcutPath"
-Write-Output 'Your database and preferences remain in the separate TheModMenagerie app-data folder.'
+Write-Output 'Your database and preferences remain in the separate %USERPROFILE%\.modmenagerie folder.'

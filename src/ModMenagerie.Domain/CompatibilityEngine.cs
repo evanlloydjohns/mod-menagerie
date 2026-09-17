@@ -2,7 +2,7 @@ namespace ModMenagerie.Domain;
 
 public static class CompatibilityEngine
 {
-    public static Evidence Evaluate(VersionCache? cache, string target, string loader, Distribution form)
+    public static Evidence Evaluate(VersionCache? cache, string target, string loader, Distribution form, IReadOnlyList<RangeRule>? rules = null)
     {
         var time = cache?.Retrieved ?? DateTimeOffset.UtcNow;
         Evidence Unknown(string why) => new(Compatibility.Unknown, why, null, time);
@@ -11,13 +11,16 @@ public static class CompatibilityEngine
         if (!cache.Complete || cache.Releases.Any(v => !v.Valid || string.IsNullOrWhiteSpace(v.Id) || v.Published == default || v.GameVersions == null || v.Loaders == null || v.Channel is not ("release" or "beta" or "alpha")))
             return Unknown("Version evidence is incomplete or contains unrecognized required metadata. Retry Refresh.");
         var required = form == Distribution.Datapack ? "datapack" : loader;
-        var candidate = cache.Releases.Where(v => v.GameVersions.Contains(target, StringComparer.Ordinal) && v.Loaders.Contains(required, StringComparer.Ordinal))
+        RangeRule? Rule(Release v) => rules?.FirstOrDefault(r => r.ProjectId == cache.ProjectId && r.ReleaseId == v.Id && r.Loader == loader && r.Form == form && VersionPatterns.Matches(r.Pattern, target));
+        var candidate = cache.Releases.Where(v => (v.GameVersions.Contains(target, StringComparer.Ordinal) || Rule(v) != null) && v.Loaders.Contains(required, StringComparer.Ordinal))
             .OrderBy(v => v.Channel == "release" ? 0 : v.Channel == "beta" ? 1 : 2)
             .ThenByDescending(v => v.Published).ThenBy(v => v.Id, StringComparer.Ordinal).FirstOrDefault();
         return candidate == null
             ? new(Compatibility.NotDetected, $"Complete check found no release explicitly listing {target} and {required}. This does not prove it cannot work.", null, time)
             : new(candidate.Channel == "release" ? Compatibility.Stable : candidate.Channel == "beta" ? Compatibility.Beta : Compatibility.Alpha,
-                $"Release {candidate.Id} explicitly lists Minecraft {target} and {required}.", candidate, time);
+                candidate.GameVersions.Contains(target, StringComparer.Ordinal)
+                    ? $"Release {candidate.Id} explicitly lists Minecraft {target} and {required}."
+                    : $"User-entered range evidence {Rule(candidate)!.Pattern} matches {target}; release {candidate.Id} explicitly lists {required}. Source: {Rule(candidate)!.Reference}. {Rule(candidate)!.Note}", candidate, time);
     }
     public static bool Positive(Compatibility status) => status is Compatibility.Stable or Compatibility.Beta or Compatibility.Alpha;
     public static string Label(Compatibility status) => status switch
