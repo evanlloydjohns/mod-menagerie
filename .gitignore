@@ -1,0 +1,17 @@
+**/bin/
+**/obj/
+artifacts/
+TestResults/
+*.db*
+.vs/
+
+# Synced reference material and local agent metadata
+sources/
+AGENTS.md
+.codex/
+.agents/
+.env
+.env.*
+*.user
+*.suo
+*.log

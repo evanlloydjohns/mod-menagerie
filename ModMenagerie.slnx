@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ModMenagerie.Application/ModMenagerie.Application.csproj" />
+    <Project Path="src/ModMenagerie.Desktop/ModMenagerie.Desktop.csproj" />
+    <Project Path="src/ModMenagerie.Domain/ModMenagerie.Domain.csproj" />
+    <Project Path="src/ModMenagerie.Infrastructure/ModMenagerie.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ModMenagerie.Tests/ModMenagerie.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/ModMenagerie.SmokeHarness/ModMenagerie.SmokeHarness.csproj" />
+  </Folder>
+</Solution>

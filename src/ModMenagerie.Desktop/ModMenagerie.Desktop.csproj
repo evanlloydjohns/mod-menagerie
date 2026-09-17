@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ModMenagerie.Infrastructure\ModMenagerie.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon>Assets\Menagerie.ico</ApplicationIcon>
+    <Product>The Mod Menagerie</Product>
+    <Title>The Mod Menagerie</Title>
+  </PropertyGroup>
+
+</Project>
